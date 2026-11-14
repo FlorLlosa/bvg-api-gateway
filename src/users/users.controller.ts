@@ -6,6 +6,7 @@ import {
   Param,
   ParseIntPipe,
   Patch,
+  Post,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 
@@ -13,10 +14,28 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Post()
+  create(
+    @Body() body: unknown,
+    @Headers('authorization') authorization: string,
+  ) {
+    return this.usersService.create(body, authorization);
+  }
+
   @Get()
   findAll(@Headers('authorization') authorization: string) {
     return this.usersService.findAll(authorization);
   }
+  @Get('my-sector')
+  findMySector(@Headers('authorization') authorization: string) {
+    return this.usersService.findMySector(authorization);
+  }
+
+  @Get('me')
+  findMe(@Headers('authorization') authorization: string) {
+    return this.usersService.findMe(authorization);
+  }
+
   @Get(':id')
   findOne(
     @Param('id', ParseIntPipe) id: number,

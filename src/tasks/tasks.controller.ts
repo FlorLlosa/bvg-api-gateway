@@ -2,15 +2,18 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   ParseIntPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+
 import { TasksService } from './tasks.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
-
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 
@@ -22,33 +25,49 @@ export class TasksController {
   @Post()
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_CREATE')
-  create(@Body() data: unknown) {
-    return this.tasksService.create(data);
+  create(
+    @Body() data: unknown,
+    @Req() request: AuthenticatedRequest,
+    @Headers('authorization') authorization: string,
+  ) {
+    return this.tasksService.create(data, request.user.userId, authorization);
   }
+
   @Get()
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_READ')
   findAll() {
     return this.tasksService.findAll();
   }
+
+  @Get('my-sector')
+  @UseGuards(PermissionsGuard)
+  @Permissions('TASKS_READ')
+  findMySector(@Headers('authorization') authorization: string) {
+    return this.tasksService.findMySector(authorization);
+  }
+
   @Get('assigned/:userId')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_READ')
   findByAssignedUser(@Param('userId', ParseIntPipe) userId: number) {
     return this.tasksService.findByAssignedUser(userId);
   }
+
   @Post('templates')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_CREATE')
   createTemplate(@Body() data: unknown) {
     return this.tasksService.createTemplate(data);
   }
+
   @Get('templates/:id')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_READ')
   findTemplate(@Param('id', ParseIntPipe) id: number) {
     return this.tasksService.findTemplate(id);
   }
+
   @Post('templates/:templateId/items')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_CREATE')
@@ -58,6 +77,7 @@ export class TasksController {
   ) {
     return this.tasksService.addTemplateItem(templateId, data);
   }
+
   @Post('templates/:templateId/create-task')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_CREATE')
@@ -67,18 +87,21 @@ export class TasksController {
   ) {
     return this.tasksService.createFromTemplate(templateId, data);
   }
+
   @Get(':id')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_READ')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.tasksService.findOne(id);
   }
+
   @Post(':id/items')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_UPDATE')
   addItem(@Param('id', ParseIntPipe) id: number, @Body() data: unknown) {
     return this.tasksService.addItem(id, data);
   }
+
   @Patch(':taskId/items/:itemId/complete')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_UPDATE')
@@ -88,18 +111,33 @@ export class TasksController {
   ) {
     return this.tasksService.completeItem(taskId, itemId);
   }
+
   @Patch(':id/status')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_UPDATE')
-  updateStatus(@Param('id', ParseIntPipe) id: number, @Body() data: unknown) {
-    return this.tasksService.updateStatus(id, data);
+  updateStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const actorUserId = request.user.userId;
+
+    return this.tasksService.updateStatus(id, data, actorUserId);
   }
+
   @Patch(':id/assign')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_ASSIGN')
-  assign(@Param('id', ParseIntPipe) id: number, @Body() data: unknown) {
-    return this.tasksService.assign(id, data);
+  assign(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const actorUserId = request.user.userId;
+
+    return this.tasksService.assign(id, data, actorUserId);
   }
+
   @Patch(':id')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_UPDATE')
