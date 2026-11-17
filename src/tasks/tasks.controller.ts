@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Headers,
   Param,
@@ -22,6 +23,14 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
+  private requireManagementRole(request: AuthenticatedRequest): void {
+    if (request.user.roleId === 2) {
+      throw new ForbiddenException(
+        'Esta operación no está permitida para empleados',
+      );
+    }
+  }
+
   @Post()
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_CREATE')
@@ -36,7 +45,8 @@ export class TasksController {
   @Get()
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_READ')
-  findAll() {
+  findAll(@Req() request: AuthenticatedRequest) {
+    this.requireManagementRole(request);
     return this.tasksService.findAll();
   }
 
@@ -50,7 +60,18 @@ export class TasksController {
   @Get('assigned/:userId')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_READ')
-  findByAssignedUser(@Param('userId', ParseIntPipe) userId: number) {
+  findByAssignedUser(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const authenticatedUser = request.user;
+
+    if (authenticatedUser.roleId === 2 && authenticatedUser.userId !== userId) {
+      throw new ForbiddenException(
+        'No podés consultar las tareas de otro empleado',
+      );
+    }
+
     return this.tasksService.findByAssignedUser(userId);
   }
 
@@ -64,7 +85,12 @@ export class TasksController {
   @Get('templates/:id')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_READ')
-  findTemplate(@Param('id', ParseIntPipe) id: number) {
+  findTemplate(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    this.requireManagementRole(request);
+
     return this.tasksService.findTemplate(id);
   }
 
@@ -91,14 +117,38 @@ export class TasksController {
   @Get(':id')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_READ')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.tasksService.findOne(id);
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<unknown> {
+    const task: unknown = await this.tasksService.findOne(id);
+
+    if (request.user.roleId === 2) {
+      if (
+        typeof task !== 'object' ||
+        task === null ||
+        !('assignedUserId' in task) ||
+        task.assignedUserId !== request.user.userId
+      ) {
+        throw new ForbiddenException(
+          'No podés consultar una tarea asignada a otro empleado',
+        );
+      }
+    }
+
+    return task;
   }
 
   @Post(':id/items')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_UPDATE')
-  addItem(@Param('id', ParseIntPipe) id: number, @Body() data: unknown) {
+  addItem(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    this.requireManagementRole(request);
+
     return this.tasksService.addItem(id, data);
   }
 
@@ -108,21 +158,59 @@ export class TasksController {
   completeItem(
     @Param('taskId', ParseIntPipe) taskId: number,
     @Param('itemId', ParseIntPipe) itemId: number,
+    @Req() request: AuthenticatedRequest,
   ) {
+    this.requireManagementRole(request);
+
     return this.tasksService.completeItem(taskId, itemId);
   }
 
   @Patch(':id/status')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_UPDATE')
-  updateStatus(
+  async updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() data: unknown,
     @Req() request: AuthenticatedRequest,
   ) {
     const actorUserId = request.user.userId;
+    const roleId = request.user.roleId;
 
-    return this.tasksService.updateStatus(id, data, actorUserId);
+    if (roleId === 2) {
+      const task = (await this.tasksService.findOne(id)) as {
+        id: number;
+        assignedUserId: number | null;
+        status: string;
+      };
+
+      if (task.assignedUserId !== actorUserId) {
+        throw new ForbiddenException(
+          'No podés modificar una tarea asignada a otro empleado',
+        );
+      }
+
+      if (
+        typeof data !== 'object' ||
+        data === null ||
+        Array.isArray(data) ||
+        !('status' in data) ||
+        data.status !== 'COMPLETED' ||
+        Object.keys(data).length !== 1
+      ) {
+        throw new ForbiddenException(
+          'El empleado solamente puede marcar sus tareas como completadas',
+        );
+      }
+    }
+
+    const updatedTask: unknown = await this.tasksService.updateStatus(
+      id,
+      data,
+      actorUserId,
+      roleId,
+    );
+
+    return updatedTask;
   }
 
   @Patch(':id/assign')
@@ -141,7 +229,13 @@ export class TasksController {
   @Patch(':id')
   @UseGuards(PermissionsGuard)
   @Permissions('TASKS_UPDATE')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: unknown) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    this.requireManagementRole(request);
+
     return this.tasksService.update(id, data);
   }
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -51,5 +52,18 @@ export class PermissionsController {
     @Headers('authorization') authorization: string,
   ) {
     return this.permissionsService.findOne(id, authorization);
+  }
+
+  @Delete(':permissionId/roles/:roleId')
+  removeFromRole(
+    @Param('permissionId', ParseIntPipe) permissionId: number,
+    @Param('roleId', ParseIntPipe) roleId: number,
+    @Headers('authorization') authorization: string,
+  ) {
+    return this.permissionsService.removeFromRole(
+      permissionId,
+      roleId,
+      authorization,
+    );
   }
 }

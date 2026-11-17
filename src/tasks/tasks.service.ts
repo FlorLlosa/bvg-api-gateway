@@ -256,7 +256,12 @@ export class TasksService {
     return response.data;
   }
 
-  async updateStatus(id: number, data: unknown, actorUserId: number) {
+  async updateStatus(
+    id: number,
+    data: unknown,
+    actorUserId: number,
+    actorRoleId: number | null,
+  ) {
     const response = await this.request(
       firstValueFrom(
         this.httpService.patch(
@@ -266,6 +271,7 @@ export class TasksService {
             headers: {
               ...this.getInternalHeaders(),
               'x-actor-user-id': String(actorUserId),
+              'x-actor-role-id': String(actorRoleId),
             },
           },
         ),
