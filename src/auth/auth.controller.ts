@@ -9,6 +9,16 @@ export class AuthController {
   login(@Body() body: unknown) {
     return this.authService.login(body);
   }
+
+  // Cambio obligatorio de contraseña en el primer ingreso
+  @Post('change-initial-password')
+  changeInitialPassword(
+    @Body() body: unknown,
+    @Headers('authorization') authorization: string,
+  ) {
+    return this.authService.changeInitialPassword(body, authorization);
+  }
+
   @Get('profile')
   profile(@Headers('authorization') authorization: string) {
     return this.authService.profile(authorization);
